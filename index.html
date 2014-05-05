@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <title>Вот такая вот классная карта</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+        <link href="css/semantic.css" rel="stylesheet">
+        <link href='http://fonts.googleapis.com/css?family=PT+Sans:400,700&subset=latin,cyrillic' rel='stylesheet' type='text/css'>
+
+        <script src="http://code.jquery.com/jquery-latest.js"></script>
+        <script src='javascript/semantic.js'></script>
+        <script src="//api-maps.yandex.ru/2.1-dev/?lang=ru-RU&load=package.full" type="text/javascript"></script>
+
+        <style type="text/css">
+            html, body, #YMapsID {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                font-family: 'PT Sans', sans-serif;
+            }
+        </style>
+
+        <script type="text/javascript">
+
+            $(document).ready(function() {
+
+                ymaps.ready(function () {
+                    var myMap = new ymaps.Map('YMapsID', {
+                        center: [55.023463,82.933082],
+                        zoom: 11,
+                        controls: ['zoomControl','searchControl', 'typeSelector']
+                    });
+
+                    ymaps.geoXml.load('map.php?'+Math.random())
+                        .then(function (res) {
+                            storedMarks = res.geoObjects;
+                            myMap.geoObjects.add(storedMarks);
+                        });
+
+                    var newMark = [];
+
+                    myMap.events.add('contextmenu', function (e) {
+                        if (!$('.ui.sidebar').sidebar('is open')) {
+                            var coords = e.get('coords');
+
+                            $('input[name=coords]').val(coords);
+
+                            newMark[0] = new ymaps.Placemark(coords, {}, {draggable: true});
+
+                            newMark[0].events.add('dragend',function (event){
+                                var coords = event.get('target').geometry.getCoordinates();
+                                $('input[name=coords]').val(coords);
+                            })
+
+                            myMap.geoObjects.add(newMark[0]);
+
+                            $('.ui.sidebar').sidebar('toggle');
+
+                            $('#color_pick .button').click(function(){
+                                newMark[0].options.set('preset',$(this).data('preset'));
+                                newMark[0].properties.set('iconContent', '');
+                                $('input[name=color]').val($(this).data('preset'));
+                            });
+
+                            $('.sidebar .negative.button').click(function(){
+                                $('.sidebar').sidebar('hide');
+                                myMap.geoObjects.remove(newMark[0]);
+                                delete newMark[0];
+                            });
+
+                            //var sessionMark = [];
+
+                            $('.sidebar .positive.button').click(function(){
+                                $('.sidebar').dimmer('show');
+                                $.ajax({
+                                    url: 'map.php',
+                                    type: 'GET',
+                                    dataType: 'text',
+                                    data: $('#new_mark_form').serialize()
+                                })  
+                                .done(function(msg){
+                                    newMarkId = parseInt(msg);
+                                    newMark[newMarkId]= new ymaps.Placemark(newMark[0].geometry.getCoordinates(),{},{});
+                                    newMark[newMarkId].options.set('preset',$('input[name=color]').val());
+                                    newMark[newMarkId].properties.set({balloonContent: '<b>'+$('input[name=title]').val()+'</b>'});
+                                    myMap.geoObjects.add(newMark[newMarkId]);
+                                    myMap.geoObjects.remove(newMark[0]);
+                                    delete newMark[0];
+                                    newMarkId = null;
+
+                                    $('#new_mark_form').find("input[type=text], textarea").val("");
+                                    $('.sidebar').dimmer('hide');
+                                    $('.sidebar').sidebar('hide');
+                                })
+                                .fail(function(){
+                                    $('.sidebar').dimmer('hide');
+                                    $('.sidebar .ui.hidden.error.message').show();
+                                });
+                            });
+                            
+                        }else{
+
+                        }
+                    });
+                });
+
+                $('.sidebar').sidebar({overlay: true});
+            });
+
+        </script>
+
+    </head>
+    <body class='ymaps-fullscreen'>
+
+        <div class="ui wide styled sidebar">
+            <div class='ui hidden error message'>
+                <i class="close icon"></i>
+                <div class='header'>
+                    Жизнь — боль
+                </div>
+                Ничего не вышло.
+            </div>
+            <div class="ui inverted dimmer">
+                <div class="ui text loader">Сохраняем</div>
+            </div>
+            <h2 class='ui header'>
+                Новая метка
+            </h2>
+            <div class='ui form'>
+                <form method='post' id='new_mark_form' action=''>
+                    <div class='field'>
+                        <label>Название</label>
+                        <input type='text' name='title'>
+                    </div>
+                    <div class='field'>
+                        <label>Цвет</label>
+                        <div class='5 fluid ui buttons' id='color_pick'>
+                            <div class="ui mini black button" data-preset='islands#blackIcon'>&nbsp;</div>
+                            <div class="ui mini red button" data-preset="islands#redIcon">&nbsp;</div>
+                            <div class="ui mini green button" data-preset="islands#darkGreenIcon">&nbsp;</div>
+                            <div class="ui mini blue button" data-preset="islands#blueIcon">&nbsp;</div>
+                            <div class="ui mini orange button" data-preset="islands#darkOrangeIcon">&nbsp;</div>
+                        </div>
+                    </div>
+                    <div class='field'>
+                        <label>Описание</label>
+                        <textarea name='description'></textarea>
+                    </div>
+                    <div class="ui horizontal divider">
+                         <i class='thumbs up icon'></i>
+                    </div>
+                    <div class="2 fluid ui buttons">
+                      <div class="ui mini negative button">Отмена</div>
+                      <div class="ui mini positive button">Сохранить</div>
+                    </div>
+
+                    <input type='hidden' name='color' id='sidebar_color'>
+                    <input type='hidden' name='coords' id='sidebar_coords'>
+                    <input type='hidden' name='task' value='save'>
+                </form>
+            </div>
+        </div>
+
+        <div id="YMapsID"></div>
+
+    </body>
+</html>
